@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "j8DGt4voi4Y=",
+  "success": true,
+  "projectFilePath": "/Users/scott.dickerson/source/repos/stuff-tracker/StuffTracker.Api/StuffTracker.Api.csproj",
+  "expectedPackageFiles": [
+    "/Users/scott.dickerson/.nuget/packages/microsoft.netcore.app.ref/8.0.19/microsoft.netcore.app.ref.8.0.19.nupkg.sha512",
+    "/Users/scott.dickerson/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.19/microsoft.aspnetcore.app.ref.8.0.19.nupkg.sha512",
+    "/Users/scott.dickerson/.nuget/packages/microsoft.netcore.app.host.osx-arm64/8.0.19/microsoft.netcore.app.host.osx-arm64.8.0.19.nupkg.sha512"
+  ],
+  "logs": []
+}

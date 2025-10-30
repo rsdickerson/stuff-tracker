@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "GcQpBMFb9tkaGluADpO5cap69ctYCsLja/DJmnkDE2w=",
+  "Source": "StuffTracker.Api",
+  "BasePath": "_content/StuffTracker.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
