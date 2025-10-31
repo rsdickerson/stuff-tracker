@@ -1,7 +1,7 @@
 # StuffTracker – Implementation Plan 
 
 **Memory Strategy:** To be defined by Manager Agent during Memory Root Creation
-**Last Modification:** Initial enhancement by Setup Agent
+**Last Modification:** Manager Agent - Added cursor pagination research requirement to Task 4.1
 **Project Overview:** Backend-only web application using .NET 8, Hot Chocolate (latest stable), and EF Core with MySQL. Demonstrates core GraphQL features (queries, mutations, filtering, pagination, sorting) while strictly separating EF entities from GraphQL DTOs. Includes comprehensive seed data and endpoint tests. Limitations discovered during projection/separation will be documented.
 
 ## Phase 1: Project Scaffolding and Infrastructure
@@ -79,13 +79,15 @@
 
 ## Phase 4: Filtering, Sorting, Pagination Integration
 
-### Task 4.1 – Apply filtering, sorting, and pagination │ Agent_API_Backend
-- **Objective:** Decorate resolvers/fields to enable rich querying capabilities.
-- **Output:** Filtering on text/numeric fields; sorting by name/quantity; paging on collections.
-- **Guidance:** Depends on: Task 3.3 Output. Ensure stable default ordering for pagination tests.
-- Sub-tasks:
-  - Apply filtering/sorting attributes on relevant resolvers.
-  - Configure cursor pagination for items and rooms.
+### Task 4.1 – Research cursor pagination approach and apply filtering, sorting, and pagination │ Agent_API_Backend
+- **Objective:** Research and validate cursor pagination implementation approach (IQueryable vs connections), then decorate resolvers/fields to enable rich querying capabilities with true cursor pagination.
+- **Output:** Research findings document, filtering on text/numeric fields; sorting by name/quantity; true cursor pagination on collections (not offset/limit).
+- **Guidance:** Depends on: Task 3.3 Output. Ensure stable default ordering for pagination tests. Developer feedback indicates IQueryable may use offset/limit (fake cursor pagination) while connections provide true cursor pagination. Research both approaches and verify which Hot Chocolate uses in our configuration.
+- Steps:
+  1. **Research cursor pagination approaches:** Investigate Hot Chocolate's cursor pagination behavior with IQueryable sources vs Connection types. Create simple test queries to verify whether `[UsePaging]` on IQueryable returns true cursor-based pagination or offset/limit. Document findings.
+  2. **Choose and validate approach:** Based on research, determine whether to use IQueryable with `[UsePaging]` or switch to Connection types for true cursor pagination. Create validation tests to confirm chosen approach provides cursor-based pagination (not offset/limit).
+  3. **Apply filtering/sorting attributes** on relevant resolvers.
+  4. **Configure cursor pagination** for items and rooms using the validated approach.
 
 ### Task 4.2 – Verify DTO-only return paths (no EF leakage) │ Agent_API_Backend
 - **Objective:** Ensure resolvers never return EF entities directly.
@@ -106,13 +108,13 @@
   2. Implement helper to post GraphQL documents and parse JSON responses reliably.
 
 ### Task 5.2 – Filtering/sorting/pagination tests over seeded data │ Agent_Testing
-- **Objective:** Validate query capabilities across text and numeric fields and page boundaries.
-- **Output:** Integration tests covering contains/startsWith/case, numeric ranges, asc/desc sorting, and cursor pagination.
-- **Guidance:** Depends on: Task 5.1 Output; Depends on: Task 2.3 Output.
+- **Objective:** Validate query capabilities across text and numeric fields and page boundaries, including verification of true cursor pagination (not offset/limit).
+- **Output:** Integration tests covering contains/startsWith/case, numeric ranges, asc/desc sorting, and true cursor pagination validation.
+- **Guidance:** Depends on: Task 5.1 Output; Depends on: Task 2.3 Output; Depends on: Task 4.1 Output. Ensure pagination tests verify cursor-based navigation (cursor strings) rather than offset/limit patterns.
 - Steps:
   1. Filtering tests over `Item.name`, `Item.quantity`, `Room.name` with deterministic expected sets.
   2. Sorting tests for asc/desc on name and quantity; verify tie-breaking for determinism.
-  3. Pagination tests validating `edges`/`pageInfo`, next/prev pages, and stable ordering.
+  3. Pagination tests validating `edges`/`pageInfo` structure, cursor strings for navigation (not offset parameters), next/prev pages, and stable ordering. Verify queries use cursor-based pagination patterns.
 
 ### Task 5.3 – Mutation tests (create/move/delete) │ Agent_Testing
 - **Objective:** Ensure mutations persist and return projected DTOs.
@@ -124,11 +126,12 @@
 ## Phase 6: Limitations Documentation
 
 ### Task 6.1 – Document EF/GQL separation limitations │ Agent_Docs
-- **Objective:** Record constraints/trade-offs when enforcing strict separation with Hot Chocolate.
+- **Objective:** Record constraints/trade-offs when enforcing strict separation with Hot Chocolate, including cursor pagination implementation findings.
 - **Output:** `docs/HotChocolate-Limitations.md` with citations.
-- **Guidance:** Depends on: Task 4.2 Output. Include references to official docs and observed behaviors.
+- **Guidance:** Depends on: Task 4.2 Output; Depends on: Task 4.1 Output. Include references to official docs and observed behaviors. Document cursor pagination approach findings (IQueryable vs connections) and any limitations discovered during Task 4.1 research.
 - Sub-tasks:
   - Summarize projection caveats and any unsupported attribute combinations.
+  - Document cursor pagination research findings and chosen approach rationale.
   - Cite official docs and decisions.
 
 ---

@@ -1,0 +1,53 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: stufftracker-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: Password12
+      MYSQL_DATABASE: stufftracker
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Initialize script to create test database
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pPassword12"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stufftracker-network
+
+  # Optional: Separate test database container for complete isolation
+  # Uncomment if you prefer separate containers for dev and test databases
+  # mysql-test:
+  #   image: mysql:8.0
+  #   container_name: stufftracker-mysql-test
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: Password12
+  #     MYSQL_DATABASE: stufftracker_test
+  #   ports:
+  #     - "3307:3306"
+  #   volumes:
+  #     - mysql_test_data:/var/lib/mysql
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pPassword12"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - stufftracker-network
+
+volumes:
+  mysql_data:
+    driver: local
+  # mysql_test_data:
+  #   driver: local
+
+networks:
+  stufftracker-network:
+    driver: bridge
+
