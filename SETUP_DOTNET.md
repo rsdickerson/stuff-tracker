@@ -1,6 +1,6 @@
 # .NET SDK Setup
 
-This project requires .NET 8.0 SDK. If you encounter SDK version errors, follow these steps:
+This project requires .NET 9.0 SDK. If you encounter SDK version errors, follow these steps:
 
 ## Quick Fix
 
@@ -15,7 +15,7 @@ Then verify:
 dotnet --list-sdks
 ```
 
-You should see `8.0.415` listed.
+You should see `9.0.109` or later listed.
 
 ## Permanent Fix
 
@@ -37,7 +37,7 @@ The project should now run successfully.
 ## Troubleshooting
 
 If you still see errors:
-1. Check that .NET 8.0 is installed: `dotnet --list-sdks`
+1. Check that .NET 9.0 is installed: `dotnet --list-sdks`
 2. Verify `global.json` exists in the project root (it pins the SDK version)
 3. Ensure you're running commands from the project directory where `global.json` is located
 

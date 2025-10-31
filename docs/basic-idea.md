@@ -91,7 +91,7 @@ type Mutation {
 
 | Layer     | Technology                                                    |
 | --------- | ------------------------------------------------------------- |
-| Backend   | .NET 8 + Hot Chocolate (GraphQL)                              |
+| Backend   | .NET 9 + Hot Chocolate (GraphQL)                              |
 | ORM       | EF Core with SQLite (simple local DB)                         |
 | Frontend  | React (Vite + TypeScript) + urql or Apollo                    |
 | Auth      | JWT (if you want to test secured APIs)                        |

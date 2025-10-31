@@ -1,6 +1,6 @@
 # StuffTracker
 
-A simple inventory management application built with .NET 8 and Hot Chocolate GraphQL to track possessions across different locations and rooms.
+A simple inventory management application built with .NET 9 and Hot Chocolate GraphQL to track possessions across different locations and rooms.
 
 ## Overview
 
@@ -18,14 +18,14 @@ The application demonstrates GraphQL best practices including:
 
 ## Prerequisites
 
-- **.NET 8 SDK** (or later)
+- **.NET 9 SDK** (or later)
 - **Docker** and **Docker Compose** (for MySQL database)
 - **dotnet-ef** tool (for migrations)
 - **m2** (Maven wrapper) or **mvn** (if using Maven for any build tasks)
 
-### Installing .NET 8 SDK
+### Installing .NET 9 SDK
 
-Download and install from [Microsoft's .NET download page](https://dotnet.microsoft.com/download/dotnet/8.0).
+Download and install from [Microsoft's .NET download page](https://dotnet.microsoft.com/download/dotnet/9.0).
 
 ### Installing dotnet-ef Tool
 
@@ -42,7 +42,7 @@ dotnet tool update --global dotnet-ef
 ### Verifying Prerequisites
 
 ```bash
-dotnet --version    # Should show 8.x.x or later
+dotnet --version    # Should show 9.x.x or later
 docker --version    # Docker should be installed
 docker-compose --version  # Docker Compose should be available
 dotnet ef --version  # EF Core tools should be available
