@@ -1,8 +1,6 @@
 using HotChocolate.Data;
-using StuffTracker.Api.GraphQL.Types;
 using StuffTracker.Domain.Data;
 using StuffTracker.Domain.Entities;
-using Types = StuffTracker.Api.GraphQL.Types;
 
 namespace StuffTracker.Api.GraphQL;
 
@@ -10,54 +8,43 @@ public class Query
 {
     /// <summary>
     /// Query all locations with filtering, sorting, and pagination support
+    /// Returns LocationEntity which is mapped to Location GraphQL type via LocationType.
     /// Filtering: Name (string)
     /// Sorting: Name, CreatedAt, Id
     /// Pagination: Cursor-based pagination with Connection type
-    /// Filtering/sorting translate to SQL: EF Core translates filters/sorts on DTO properties
-    /// back to entity properties because property names match and projection is simple direct mapping
+    /// UseProjection, UseFiltering, and UseSorting work at the EF level and translate to SQL.
     /// </summary>
     [UsePaging]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
-    public IQueryable<Types.Location> GetLocations(StuffTrackerDbContext context)
+    public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
         => context.Locations
-            .OrderBy(l => l.Id) // Stable default ordering for deterministic pagination
-            .Select(l => new Types.Location
-            {
-                Id = l.Id,
-                Name = l.Name,
-                CreatedAt = l.CreatedAt
-            });
+            .OrderBy(l => l.Id); // Stable default ordering for deterministic pagination
 
     /// <summary>
     /// Query a single location by ID
+    /// Returns LocationEntity which is mapped to Location GraphQL type via LocationType.
     /// </summary>
     [UseProjection]
-    public Types.Location? GetLocation(int id, StuffTrackerDbContext context)
+    public LocationEntity? GetLocation(int id, StuffTrackerDbContext context)
         => context.Locations
             .Where(l => l.Id == id)
-            .Select(l => new Types.Location
-            {
-                Id = l.Id,
-                Name = l.Name,
-                CreatedAt = l.CreatedAt
-            })
             .FirstOrDefault();
 
     /// <summary>
     /// Query items filtered by name search (case-insensitive)
+    /// Returns ItemEntity which is mapped to Item GraphQL type via ItemType.
     /// Filtering: Name (string), Quantity (int), RoomId (int)
     /// Sorting: Name, Quantity, CreatedAt, Id
     /// Pagination: Cursor-based pagination with Connection type
-    /// Filtering/sorting translate to SQL: EF Core translates filters/sorts on DTO properties
-    /// back to entity properties because property names match and projection is simple direct mapping
+    /// UseProjection, UseFiltering, and UseSorting work at the EF level and translate to SQL.
     /// </summary>
     [UsePaging]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
-    public IQueryable<Types.Item> GetItems(string? search, StuffTrackerDbContext context)
+    public IQueryable<ItemEntity> GetItems(string? search, StuffTrackerDbContext context)
     {
         var query = context.Items.AsQueryable();
         
@@ -66,16 +53,9 @@ public class Query
             query = query.Where(i => i.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
         }
         
-        // Don't apply default OrderBy here - let UseSorting handle it
-        // If no sort is specified, UseSorting will use default (Id)
-        // Apply projection after sorting (Hot Chocolate middleware handles this)
-        return query.Select(i => new Types.Item
-        {
-            Id = i.Id,
-            Name = i.Name,
-            Quantity = i.Quantity,
-            RoomId = i.RoomId,
-            CreatedAt = i.CreatedAt
-        });
+        // Apply stable default ordering before pagination
+        // This ensures deterministic cursor behavior and satisfies EF Core's requirement
+        // Client sorting via UseSorting can override this default ordering
+        return query.OrderBy(i => i.Id); // Stable default ordering for deterministic pagination
     }
 }

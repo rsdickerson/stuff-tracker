@@ -201,9 +201,9 @@ All queries and mutations use explicit manual projections:
 
 Only DTO types are registered in the GraphQL schema:
 ```csharp
-.AddType<StuffTracker.Api.GraphQL.Types.Location>()
-.AddType<StuffTracker.Api.GraphQL.Types.Room>()
-.AddType<StuffTracker.Api.GraphQL.Types.Item>()
+.AddType<StuffTracker.Api.GraphQL.Types.LocationType>()
+.AddType<StuffTracker.Api.GraphQL.Types.RoomType>()
+.AddType<StuffTracker.Api.GraphQL.Types.ItemType>()
 ```
 
 No EF entity types are registered, preventing accidental exposure.

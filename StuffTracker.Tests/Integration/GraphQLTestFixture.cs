@@ -17,7 +17,7 @@ namespace StuffTracker.Tests.Integration;
 /// </summary>
 public class GraphQLTestFixture : WebApplicationFactory<IAssemblyMarker>
 {
-    private const string TestConnectionString = "Server=localhost;Database=stufftracker_test;User=root;Password=Password12;";
+    private const string TestConnectionString = "Server=localhost;Database=stufftracker_test;User=admin;Password=Password12;";
     private static readonly SemaphoreSlim _dbInitLock = new SemaphoreSlim(1, 1);
     
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -78,7 +78,7 @@ public class GraphQLTestFixture : WebApplicationFactory<IAssemblyMarker>
         try
         {
             // First, ensure the database exists by connecting without database name
-            var serverConnectionString = "Server=localhost;User=root;Password=Password12;";
+            var serverConnectionString = "Server=localhost;User=admin;Password=Password12;";
             await using var connection = new MySqlConnection(serverConnectionString);
             await connection.OpenAsync();
             
@@ -149,6 +149,20 @@ public class GraphQLTestFixture : WebApplicationFactory<IAssemblyMarker>
     {
         var scope = Services.CreateScope();
         return scope.ServiceProvider.GetRequiredService<StuffTrackerDbContext>();
+    }
+
+    /// <summary>
+    /// Override CreateClient to disable cookie handling.
+    /// This works around a .NET 9 issue on macOS where GetDomainName() fails.
+    /// </summary>
+    public new HttpClient CreateClient()
+    {
+        return CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = false,
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("http://localhost")
+        });
     }
 }
 

@@ -23,9 +23,9 @@ builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
     .AddMutationType<Mutation>()
-    .AddType<StuffTracker.Api.GraphQL.Types.Location>()
-    .AddType<StuffTracker.Api.GraphQL.Types.Room>()
-    .AddType<StuffTracker.Api.GraphQL.Types.Item>()
+    .AddType<StuffTracker.Api.GraphQL.Types.LocationType>()
+    .AddType<StuffTracker.Api.GraphQL.Types.RoomType>()
+    .AddType<StuffTracker.Api.GraphQL.Types.ItemType>()
     .AddProjections()
     .AddFiltering()
     .AddSorting();

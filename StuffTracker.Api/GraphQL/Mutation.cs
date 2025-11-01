@@ -1,9 +1,7 @@
 using HotChocolate;
 using HotChocolate.Data;
-using StuffTracker.Api.GraphQL.Types;
 using StuffTracker.Domain.Data;
 using StuffTracker.Domain.Entities;
-using Types = StuffTracker.Api.GraphQL.Types;
 
 namespace StuffTracker.Api.GraphQL;
 
@@ -11,9 +9,10 @@ public class Mutation
 {
     /// <summary>
     /// Create a new location
+    /// Returns LocationEntity which is mapped to Location GraphQL type via LocationType.
     /// </summary>
     [UseProjection]
-    public async Task<Types.Location> AddLocation(
+    public async Task<LocationEntity> AddLocation(
         string name,
         StuffTrackerDbContext context,
         CancellationToken cancellationToken)
@@ -27,19 +26,15 @@ public class Mutation
         context.Locations.Add(location);
         await context.SaveChangesAsync(cancellationToken);
 
-        return new Types.Location
-        {
-            Id = location.Id,
-            Name = location.Name,
-            CreatedAt = location.CreatedAt
-        };
+        return location;
     }
 
     /// <summary>
     /// Create a new room in a location
+    /// Returns RoomEntity which is mapped to Room GraphQL type via RoomType.
     /// </summary>
     [UseProjection]
-    public async Task<Types.Room> AddRoom(
+    public async Task<RoomEntity> AddRoom(
         string name,
         int locationId,
         StuffTrackerDbContext context,
@@ -61,20 +56,15 @@ public class Mutation
         context.Rooms.Add(room);
         await context.SaveChangesAsync(cancellationToken);
 
-        return new Types.Room
-        {
-            Id = room.Id,
-            Name = room.Name,
-            LocationId = room.LocationId,
-            CreatedAt = room.CreatedAt
-        };
+        return room;
     }
 
     /// <summary>
     /// Create a new item in a room
+    /// Returns ItemEntity which is mapped to Item GraphQL type via ItemType.
     /// </summary>
     [UseProjection]
-    public async Task<Types.Item> AddItem(
+    public async Task<ItemEntity> AddItem(
         string name,
         int quantity,
         int roomId,
@@ -98,21 +88,15 @@ public class Mutation
         context.Items.Add(item);
         await context.SaveChangesAsync(cancellationToken);
 
-        return new Types.Item
-        {
-            Id = item.Id,
-            Name = item.Name,
-            Quantity = item.Quantity,
-            RoomId = item.RoomId,
-            CreatedAt = item.CreatedAt
-        };
+        return item;
     }
 
     /// <summary>
     /// Move an item to a different room
+    /// Returns ItemEntity which is mapped to Item GraphQL type via ItemType.
     /// </summary>
     [UseProjection]
-    public async Task<Types.Item> MoveItem(
+    public async Task<ItemEntity> MoveItem(
         int itemId,
         int newRoomId,
         StuffTrackerDbContext context,
@@ -133,14 +117,7 @@ public class Mutation
         item.RoomId = newRoomId;
         await context.SaveChangesAsync(cancellationToken);
 
-        return new Types.Item
-        {
-            Id = item.Id,
-            Name = item.Name,
-            Quantity = item.Quantity,
-            RoomId = item.RoomId,
-            CreatedAt = item.CreatedAt
-        };
+        return item;
     }
 
     /// <summary>
