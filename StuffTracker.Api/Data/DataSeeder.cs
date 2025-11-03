@@ -11,13 +11,11 @@ public static class DataSeeder
         using var scope = serviceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<StuffTrackerDbContext>();
 
-        // Note: In test environment, tables may be truncated before seeding
-        // So we don't check for existing data - we always seed if called
-        // The check below would prevent seeding after truncate
-        // if (await dbContext.Locations.AnyAsync())
-        // {
-        //     return; // Data already seeded
-        // }
+        // Check if database is already seeded
+        if (await dbContext.Locations.AnyAsync())
+        {
+            return; // Data already exists, skip seeding
+        }
 
         var now = DateTime.UtcNow;
         var locations = new List<LocationEntity>

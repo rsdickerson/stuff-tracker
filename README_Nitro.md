@@ -266,13 +266,15 @@ query {
 
 ## Sorting
 
+> **💡 Pro Tip:** For deterministic pagination, always include `id` in your sort order when sorting by fields that may have duplicate values. This ensures stable cursor pagination.
+
 ### Sort by Name (Ascending)
 
 ```graphql
 query {
   locations(
     first: 10
-    order: { name: ASC }
+    order: { name: ASC, id: ASC }
   ) {
     nodes {
       id
@@ -288,7 +290,7 @@ query {
 query {
   items(
     first: 10
-    order: { name: DESC }
+    order: { name: DESC, id: ASC }
   ) {
     nodes {
       id
@@ -305,7 +307,7 @@ query {
 query {
   items(
     first: 10
-    order: { quantity: DESC, name: ASC }
+    order: { quantity: DESC, name: ASC, id: ASC }
   ) {
     nodes {
       id
@@ -316,6 +318,8 @@ query {
 }
 ```
 
+**Note:** Including `id: ASC` as the final sort field ensures deterministic ordering when `quantity` and `name` have duplicate values.
+
 ### Sort with Filtering
 
 ```graphql
@@ -323,7 +327,7 @@ query {
   items(
     first: 10
     where: { name: { contains: "box" } }
-    order: { name: ASC }
+    order: { name: ASC, id: ASC }
   ) {
     nodes {
       id

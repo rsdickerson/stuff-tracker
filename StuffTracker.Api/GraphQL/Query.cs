@@ -1,4 +1,6 @@
 using HotChocolate.Data;
+using Microsoft.EntityFrameworkCore;
+using StuffTracker.Api.GraphQL.Sorting;
 using StuffTracker.Domain.Data;
 using StuffTracker.Domain.Entities;
 
@@ -7,56 +9,48 @@ namespace StuffTracker.Api.GraphQL;
 public class Query
 {
     /// <summary>
-    /// Query all locations with filtering, sorting, and pagination support
-    /// Returns LocationEntity which is mapped to Location GraphQL type via LocationType.
+    /// Query all locations with filtering, sorting, and pagination support.
     /// Filtering: Name (string)
-    /// Sorting: Name, CreatedAt, Id (default: Id ASC for deterministic pagination)
-    /// Pagination: Cursor-based pagination with Connection type
-    /// UseProjection, UseFiltering, and UseSorting work at the EF level and translate to SQL.
-    /// Middleware order: UsePaging → UseProjection → UseFiltering → UseSorting (enforced by Hot Chocolate)
+    /// Sorting: Name, CreatedAt, Id (LocationSortType exposes Id for tiebreaker)
+    /// Pagination: Keyset pagination via AddDbContextCursorPagingProvider
+    /// Client sort order is respected: order: { name: ASC } → SQL: ORDER BY Name, Id
+    /// No hardcoded OrderBy - let UseSorting middleware handle client-specified ordering
     /// </summary>
     [UsePaging]
     [UseProjection]
     [UseFiltering]
-    [UseSorting]
+    [UseSorting(typeof(LocationSortType))]
     public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
-        => context.Locations; // No OrderBy - let UseSorting handle all ordering
+        => context.Locations;
 
     /// <summary>
-    /// Query a single location by ID
-    /// Returns LocationEntity which is mapped to Location GraphQL type via LocationType.
+    /// Query a single location by ID.
     /// </summary>
     [UseProjection]
     public LocationEntity? GetLocation(int id, StuffTrackerDbContext context)
-        => context.Locations
-            .Where(l => l.Id == id)
-            .FirstOrDefault();
+        => context.Locations.FirstOrDefault(l => l.Id == id);
 
     /// <summary>
-    /// Query items filtered by name search (case-insensitive)
-    /// Returns ItemEntity which is mapped to Item GraphQL type via ItemType.
-    /// Filtering: Name (string), Quantity (int), RoomId (int)
-    /// Sorting: Name, Quantity, CreatedAt, Id (default: Id ASC for deterministic pagination)
-    /// Pagination: Cursor-based pagination with Connection type
-    /// UseProjection, UseFiltering, and UseSorting work at the EF level and translate to SQL.
-    /// Middleware order: UsePaging → UseProjection → UseFiltering → UseSorting (enforced by Hot Chocolate)
+    /// Query items filtered by name (case-insensitive).
+    /// Filtering: Name, Quantity, RoomId
+    /// Sorting: Name, Quantity, CreatedAt, Id (ItemSortType exposes Id for tiebreaker)
+    /// Pagination: Keyset pagination via AddDbContextCursorPagingProvider
+    /// Client sort order is respected: order: { quantity: DESC } → SQL: ORDER BY Quantity DESC, Id ASC
+    /// No hardcoded OrderBy - let UseSorting middleware handle client-specified ordering
     /// </summary>
     [UsePaging]
     [UseProjection]
     [UseFiltering]
-    [UseSorting]
+    [UseSorting(typeof(ItemSortType))]
     public IQueryable<ItemEntity> GetItems(string? search, StuffTrackerDbContext context)
     {
         var query = context.Items.AsQueryable();
-        
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(i => i.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
         }
-        
-        // No OrderBy - let UseSorting handle all ordering
-        // Hot Chocolate will add default ORDER BY for pagination when needed
-        // Client can specify sorting via order parameter: order: [{ name: ASC }]
+
         return query;
     }
 }

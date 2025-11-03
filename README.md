@@ -289,16 +289,25 @@ mutation {
 
 ### GraphQL Features
 
-- **Cursor-based Pagination**: Compliant with GraphQL Cursor Connections Specification
-- **Filtering**: Automatic filtering support on DTO properties
-- **Sorting**: Automatic sorting support on DTO properties
-- **Strict EF/GQL Separation**: All queries and mutations return DTOs only (no EF entity leakage)
+- **Keyset Pagination**: True cursor-based pagination using WHERE clause comparisons (not OFFSET) for optimal performance
+- **Filtering**: Automatic filtering support on entity properties via Hot Chocolate middleware
+- **Sorting**: Automatic sorting support with client-specified order taking precedence
+- **Strict EF/GQL Separation**: GraphQL types backed by EF entities with automatic projection via `ObjectType<T>`
 
 ## Additional Resources
 
+### Documentation
+- **GraphQL IDE Guide**: See [README_Nitro.md](README_Nitro.md) for using Banana Cake Pop (Nitro) IDE
+- **Postman Guide**: See [README_Postman.md](README_Postman.md) for API testing with Postman
 - **Docker Setup**: See [README_Docker.md](README_Docker.md) for detailed Docker configuration
 - **Project Overview**: See [docs/basic-idea.md](docs/basic-idea.md) for project concept and design
-- **Hot Chocolate Limitations**: See [docs/HotChocolate-Limitations.md](docs/HotChocolate-Limitations.md) for EF/GQL separation constraints and implementation details
+- **Hot Chocolate Limitations**: See [docs/HotChocolate-Limitations.md](docs/HotChocolate-Limitations.md) for EF/GQL separation constraints
+- **Custom Sort Types**: See [docs/Custom-Sort-Types.md](docs/Custom-Sort-Types.md) for deterministic pagination implementation
+
+### Recent Updates
+- **Keyset Pagination**: See [KEYSET_PAGINATION_IMPLEMENTATION.md](KEYSET_PAGINATION_IMPLEMENTATION.md) for keyset pagination implementation
+- **Seed Data Update**: See [SEED_DATA_UPDATE.md](SEED_DATA_UPDATE.md) for recent seed data changes
+- **Custom Sort Types Summary**: See [CUSTOM_SORT_TYPES_SUMMARY.md](CUSTOM_SORT_TYPES_SUMMARY.md) for custom sort implementation details
 
 ## Troubleshooting
 

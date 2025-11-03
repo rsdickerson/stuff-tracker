@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StuffTracker.Domain.Data;
 
@@ -11,9 +12,11 @@ using StuffTracker.Domain.Data;
 namespace StuffTracker.Api.Migrations
 {
     [DbContext(typeof(StuffTrackerDbContext))]
-    partial class StuffTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251103194238_AddPaginationIndexes")]
+    partial class AddPaginationIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

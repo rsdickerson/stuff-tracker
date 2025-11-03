@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using StuffTracker.Api.Data;
 using StuffTracker.Api.GraphQL;
+using StuffTracker.Api.GraphQL.Types;
+using StuffTracker.Api.GraphQL.Sorting;
 using StuffTracker.Domain.Data;
 using HotChocolate.Data;
 using HotChocolate.AspNetCore;
@@ -23,18 +25,29 @@ builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
     .AddMutationType<Mutation>()
-    .AddType<StuffTracker.Api.GraphQL.Types.LocationType>()
-    .AddType<StuffTracker.Api.GraphQL.Types.RoomType>()
-    .AddType<StuffTracker.Api.GraphQL.Types.ItemType>()
+    .AddType<LocationType>()
+    .AddType<RoomType>()
+    .AddType<ItemType>()
     .AddProjections()
     .AddFiltering()
     .AddSorting()
+    .AddType<LocationSortType>()
+    .AddType<ItemSortType>()
+    .AddDbContextCursorPagingProvider() // Enable EF Core keyset pagination
+    .ModifyRequestOptions(opt =>
+    {
+        opt.IncludeExceptionDetails = builder.Environment.IsDevelopment();
+    })
     .ModifyPagingOptions(opt =>
     {
         opt.DefaultPageSize = 50;
-        opt.IncludeTotalCount = true; // Include total count in pagination results
-        opt.RequirePagingBoundaries = false; // Don't require first/last parameters
+        opt.MaxPageSize = 1000;
+        opt.IncludeTotalCount = true;
+        opt.RequirePagingBoundaries = false;
     });
+
+
+
 
 var app = builder.Build();
 
