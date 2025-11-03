@@ -58,7 +58,7 @@ public class GraphQLTestFixture : WebApplicationFactory<IAssemblyMarker>
             services.AddDbContext<StuffTrackerDbContext>(options =>
                 options.UseMySql(
                     TestConnectionString,
-                    ServerVersion.AutoDetect(TestConnectionString),
+                    new MySqlServerVersion(new Version(8, 0, 21)), // MySQL 8.0.21+
                     mysqlOptions => mysqlOptions.MigrationsAssembly("StuffTracker.Api")
                 )
                 .LogTo(_ => { }, LogLevel.None) // Suppress EF Core logging

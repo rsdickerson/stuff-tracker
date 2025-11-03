@@ -283,11 +283,11 @@ This query:
 **Request Body:**
 ```json
 {
-  "query": "mutation { addRoom(name: \"Living Room\", locationId: 1) { id name locationId createdAt } }"
+  "query": "mutation { addRoom(name: \"Office\", locationId: 1) { id name locationId createdAt } }"
 }
 ```
 
-**Note:** Replace `locationId: 1` with an actual location ID from your database.
+**Note:** Replace `locationId: 1` with an actual location ID from your database (1 = Home, 2 = Rental 101 Howards Ave, 3 = Flip 3231 Gooseneck Rd).
 
 **Error Example (Invalid Location ID):**
 ```json
@@ -308,11 +308,11 @@ This query:
 **Request Body:**
 ```json
 {
-  "query": "mutation { addItem(name: \"Laptop\", quantity: 2, roomId: 1) { id name quantity roomId createdAt } }"
+  "query": "mutation { addItem(name: \"Winter Clothes\", quantity: 10, roomId: 2) { id name quantity roomId createdAt } }"
 }
 ```
 
-**Note:** Replace `roomId: 1` with an actual room ID from your database.
+**Note:** Replace `roomId: 2` with an actual room ID from your database.
 
 **Error Example (Invalid Room ID):**
 ```json

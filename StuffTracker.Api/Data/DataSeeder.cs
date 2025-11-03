@@ -22,9 +22,9 @@ public static class DataSeeder
         var now = DateTime.UtcNow;
         var locations = new List<LocationEntity>
         {
-            new LocationEntity { Name = "Cary", CreatedAt = now },
-            new LocationEntity { Name = "Lake House", CreatedAt = now },
-            new LocationEntity { Name = "Storage", CreatedAt = now }
+            new LocationEntity { Name = "Home", CreatedAt = now },
+            new LocationEntity { Name = "Rental 101 Howards Ave", CreatedAt = now },
+            new LocationEntity { Name = "Flip 3231 Gooseneck Rd", CreatedAt = now }
         };
 
         await dbContext.Locations.AddRangeAsync(locations);
@@ -33,9 +33,9 @@ public static class DataSeeder
         // Define room names for each location (4 rooms per location)
         var roomNamesByLocation = new Dictionary<string, List<string>>
         {
-            { "Cary", new List<string> { "Living Room", "Bedroom", "Kitchen", "Office" } },
-            { "Lake House", new List<string> { "Main Floor", "Basement", "Deck", "Garage" } },
-            { "Storage", new List<string> { "Unit A", "Unit B", "Unit C", "Unit D" } }
+            { "Home", new List<string> { "Garage", "Basement", "Attic", "Office" } },
+            { "Rental 101 Howards Ave", new List<string> { "Living Room", "Kitchen", "Bedroom", "Bathroom" } },
+            { "Flip 3231 Gooseneck Rd", new List<string> { "Workshop", "Storage", "Main Floor", "Garage" } }
         };
 
         var rooms = new List<RoomEntity>();

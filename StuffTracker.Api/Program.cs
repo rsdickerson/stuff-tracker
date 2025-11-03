@@ -14,7 +14,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<StuffTrackerDbContext>(options =>
     options.UseMySql(
         connectionString,
-        ServerVersion.AutoDetect(connectionString),
+        new MySqlServerVersion(new Version(8, 0, 21)), // MySQL 8.0.21+
         mysqlOptions => mysqlOptions.MigrationsAssembly("StuffTracker.Api")
     ));
 
@@ -28,12 +28,18 @@ builder.Services
     .AddType<StuffTracker.Api.GraphQL.Types.ItemType>()
     .AddProjections()
     .AddFiltering()
-    .AddSorting();
+    .AddSorting()
+    .ModifyPagingOptions(opt =>
+    {
+        opt.DefaultPageSize = 50;
+        opt.IncludeTotalCount = true; // Include total count in pagination results
+        opt.RequirePagingBoundaries = false; // Don't require first/last parameters
+    });
 
 var app = builder.Build();
 
-// Apply migrations and seed database (only in development environment)
-if (app.Environment.IsDevelopment())
+// Apply migrations and seed database (only in development environment, not during tests)
+if (app.Environment.IsDevelopment() && app.Environment.EnvironmentName != "Test")
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<StuffTrackerDbContext>();
@@ -57,3 +63,6 @@ app.MapGraphQL().WithOptions(new GraphQLServerOptions
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
+
+// Make Program class accessible for testing with WebApplicationFactory
+public partial class Program { }
