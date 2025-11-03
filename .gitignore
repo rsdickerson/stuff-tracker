@@ -1,3 +1,6 @@
+.apm/
+.cursor/
+
 ## .NET Core / ASP.NET Core
 ## Ignore build outputs and generated files
 
