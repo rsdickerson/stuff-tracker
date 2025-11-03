@@ -1,6 +1,6 @@
 # Docker Setup for StuffTracker
 
-This project uses Docker Compose to run MySQL databases for development and testing.
+This document describes the Docker Compose setup for running MySQL databases for both development and testing environments.
 
 ## Quick Start
 
@@ -21,19 +21,20 @@ docker-compose down -v
 
 ## Database Configuration
 
-### Main Database (Development)
+### Development Database
 - **Container Name:** `stufftracker-mysql`
 - **Port:** `3306`
 - **Database:** `stufftracker`
-- **Username:** `root`
-- **Password:** `Password12`
-- **Connection String:** `Server=localhost;Database=stufftracker;User=root;Password=Password12;`
+- **Admin User:** `admin` / `Password12`
+- **Root User:** `root` / `Password12`
+- **Connection String:** `Server=localhost;Database=stufftracker;User=admin;Password=Password12;`
 
 ### Test Database
 - **Database:** `stufftracker_test` (same MySQL instance)
-- **Connection String:** `Server=localhost;Database=stufftracker_test;User=root;Password=Password12;`
+- **User:** `admin` / `Password12`
+- **Connection String:** `Server=localhost;Database=stufftracker_test;User=admin;Password=Password12;`
 
-The test database is automatically created on first startup via the initialization script.
+The test database is automatically created on first startup via the `docker/mysql/init.sql` initialization script.
 
 ## Verification
 
@@ -49,6 +50,10 @@ docker-compose logs mysql
 
 Connect to MySQL CLI:
 ```bash
+# Connect as admin user
+docker exec -it stufftracker-mysql mysql -uadmin -pPassword12
+
+# Connect as root user
 docker exec -it stufftracker-mysql mysql -uroot -pPassword12
 ```
 

@@ -21,7 +21,6 @@ The application demonstrates GraphQL best practices including:
 - **.NET 9 SDK** (or later)
 - **Docker** and **Docker Compose** (for MySQL database)
 - **dotnet-ef** tool (for migrations)
-- **m2** (Maven wrapper) or **mvn** (if using Maven for any build tasks)
 
 ### Installing .NET 9 SDK
 
@@ -186,23 +185,117 @@ The test suite includes:
 
 The test suite automatically uses a separate test database (`stufftracker_test`) to ensure isolation from development data. The test database is created automatically by the initialization script when the MySQL container starts.
 
+## Architecture
+
+### System Architecture
+
+```mermaid
+graph TB
+    Client[GraphQL Client<br/>Banana Cake Pop IDE] -->|HTTP/HTTPS| API[StuffTracker.Api<br/>Hot Chocolate GraphQL Server]
+    API -->|Query/Mutation| Resolvers[GraphQL Resolvers<br/>Query.cs, Mutation.cs]
+    Resolvers -->|Middleware Chain| Middleware{Data Middleware}
+    Middleware -->|UsePaging| Paging[Cursor Pagination]
+    Middleware -->|UseFiltering| Filtering[Filter Translation]
+    Middleware -->|UseSorting| Sorting[Sort Translation]
+    Middleware -->|UseProjection| Projection[Entity → DTO]
+    
+    Paging --> EF[Entity Framework Core]
+    Filtering --> EF
+    Sorting --> EF
+    Projection --> EF
+    
+    EF -->|SQL Queries| DB[(MySQL Database<br/>stufftracker)]
+    
+    API -.->|Keyset Pagination| KeysetProvider[DbContextCursorPagingProvider]
+    KeysetProvider -.->|WHERE clause| DB
+    
+    style Client fill:#90EE90
+    style API fill:#FFD700
+    style DB fill:#FF6B6B
+    style Middleware fill:#87CEEB
+    style KeysetProvider fill:#DDA0DD
+```
+
+### Data Model
+
+```mermaid
+erDiagram
+    LOCATION ||--o{ ROOM : "contains"
+    ROOM ||--o{ ITEM : "stores"
+    
+    LOCATION {
+        int Id PK
+        string Name
+        datetime CreatedAt
+    }
+    
+    ROOM {
+        int Id PK
+        string Name
+        int LocationId FK
+        datetime CreatedAt
+    }
+    
+    ITEM {
+        int Id PK
+        string Name
+        int Quantity
+        int RoomId FK
+        datetime CreatedAt
+    }
+```
+
+### GraphQL Middleware Flow
+
+```mermaid
+graph LR
+    Request[GraphQL Request] -->|Parse| Schema[Schema Validation]
+    Schema -->|Resolve| Resolver[Query/Mutation Resolver]
+    Resolver -->|IQueryable Entity| Middleware1[UsePaging]
+    Middleware1 -->|Apply Cursors| Middleware2[UseProjection]
+    Middleware2 -->|Entity → DTO| Middleware3[UseFiltering]
+    Middleware3 -->|WHERE| Middleware4[UseSorting]
+    Middleware4 -->|ORDER BY| EFCore[EF Core Translation]
+    EFCore -->|Optimized SQL| Database[(MySQL)]
+    Database -->|Results| DTOs[GraphQL DTOs]
+    DTOs -->|JSON| Response[GraphQL Response]
+    
+    style Request fill:#90EE90
+    style Middleware1 fill:#FFD700
+    style Middleware2 fill:#87CEEB
+    style Middleware3 fill:#DDA0DD
+    style Middleware4 fill:#FFA07A
+    style Database fill:#FF6B6B
+    style Response fill:#90EE90
+```
+
 ## Project Structure
 
 ```
 stuff-tracker/
-├── StuffTracker.Api/          # GraphQL API project
-│   ├── GraphQL/               # GraphQL resolvers and types
-│   │   ├── Query.cs           # Query resolvers
-│   │   ├── Mutation.cs        # Mutation resolvers
-│   │   └── Types/             # GraphQL DTO types
-│   ├── Data/                  # Data seeding
-│   ├── Migrations/            # EF Core migrations
-│   └── Program.cs             # Application entry point
+├── StuffTracker.Api/           # GraphQL API project
+│   ├── GraphQL/                # GraphQL resolvers and types
+│   │   ├── Query.cs            # Query resolvers
+│   │   ├── Mutation.cs         # Mutation resolvers
+│   │   ├── Types/              # GraphQL ObjectType mappings
+│   │   │   ├── LocationType.cs # Location GraphQL type
+│   │   │   ├── RoomType.cs     # Room GraphQL type
+│   │   │   └── ItemType.cs     # Item GraphQL type
+│   │   └── Sorting/            # Custom sort types
+│   │       ├── LocationSortType.cs
+│   │       └── ItemSortType.cs
+│   ├── Data/                   # Data seeding
+│   ├── Migrations/             # EF Core migrations
+│   └── Program.cs              # Application entry point
 ├── StuffTracker.Domain/        # Domain layer
-│   ├── Entities/             # EF Core entities
-│   └── Data/                  # DbContext and factory
+│   ├── Entities/               # EF Core entities
+│   │   ├── LocationEntity.cs
+│   │   ├── RoomEntity.cs
+│   │   └── ItemEntity.cs
+│   └── Data/                   # DbContext and factory
+│       └── StuffTrackerDbContext.cs
 ├── StuffTracker.Tests/         # Test project
-│   └── Integration/           # Integration tests
+│   └── Integration/            # Integration tests
 ├── docker-compose.yml          # Docker Compose configuration
 ├── docs/                       # Documentation
 └── README.md                   # This file
@@ -294,20 +387,22 @@ mutation {
 - **Sorting**: Automatic sorting support with client-specified order taking precedence
 - **Strict EF/GQL Separation**: GraphQL types backed by EF entities with automatic projection via `ObjectType<T>`
 
-## Additional Resources
+## Documentation
 
-### Documentation
-- **GraphQL IDE Guide**: See [README_Nitro.md](README_Nitro.md) for using Banana Cake Pop (Nitro) IDE
-- **Postman Guide**: See [README_Postman.md](README_Postman.md) for API testing with Postman
-- **Docker Setup**: See [README_Docker.md](README_Docker.md) for detailed Docker configuration
-- **Project Overview**: See [docs/basic-idea.md](docs/basic-idea.md) for project concept and design
-- **Hot Chocolate Limitations**: See [docs/HotChocolate-Limitations.md](docs/HotChocolate-Limitations.md) for EF/GQL separation constraints
-- **Custom Sort Types**: See [docs/Custom-Sort-Types.md](docs/Custom-Sort-Types.md) for deterministic pagination implementation
+### Getting Started
+- **[README_Nitro.md](README_Nitro.md)** - Complete guide to using Banana Cake Pop GraphQL IDE with examples, diagrams, and best practices
+- **[README_Docker.md](README_Docker.md)** - Docker Compose setup and MySQL database configuration
 
-### Recent Updates
-- **Keyset Pagination**: See [KEYSET_PAGINATION_IMPLEMENTATION.md](KEYSET_PAGINATION_IMPLEMENTATION.md) for keyset pagination implementation
-- **Seed Data Update**: See [SEED_DATA_UPDATE.md](SEED_DATA_UPDATE.md) for recent seed data changes
-- **Custom Sort Types Summary**: See [CUSTOM_SORT_TYPES_SUMMARY.md](CUSTOM_SORT_TYPES_SUMMARY.md) for custom sort implementation details
+### Architecture & Implementation
+- **[docs/basic-idea.md](docs/basic-idea.md)** - Original project concept and design rationale
+- **[docs/HotChocolate-Limitations.md](docs/HotChocolate-Limitations.md)** - Deep dive into EF/GraphQL separation patterns and Hot Chocolate constraints
+- **[docs/Custom-Sort-Types.md](docs/Custom-Sort-Types.md)** - Custom sort type implementation for deterministic keyset pagination
+- **[KEYSET_PAGINATION_IMPLEMENTATION.md](KEYSET_PAGINATION_IMPLEMENTATION.md)** - Keyset pagination configuration and verification guide
+
+### External Resources
+- [Hot Chocolate Documentation](https://chillicream.com/docs/hotchocolate)
+- [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)
+- [Entity Framework Core Documentation](https://learn.microsoft.com/en-us/ef/core/)
 
 ## Troubleshooting
 

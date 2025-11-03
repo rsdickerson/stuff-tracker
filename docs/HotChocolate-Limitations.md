@@ -1,389 +1,478 @@
-# Hot Chocolate Limitations and Trade-offs: EF/GQL Separation
+# Hot Chocolate Implementation Guide: EF/GraphQL Separation
 
-This document records constraints, trade-offs, and implementation findings when enforcing strict separation between Entity Framework (EF) entities and GraphQL DTOs in the StuffTracker application using Hot Chocolate GraphQL.
+This document describes how StuffTracker implements clean separation between Entity Framework (EF) entities and GraphQL schema using Hot Chocolate's `ObjectType<T>` pattern with automatic projections and keyset pagination.
 
 ## Table of Contents
 
-1. [Cursor Pagination Implementation](#cursor-pagination-implementation)
-2. [Projection Caveats](#projection-caveats)
-3. [EF/GQL Separation Constraints](#efgql-separation-constraints)
-4. [Best Practices and Patterns](#best-practices-and-patterns)
-5. [References](#references)
+1. [Implementation Approach](#implementation-approach)
+2. [ObjectType Pattern](#objecttype-pattern)
+3. [Keyset Pagination](#keyset-pagination)
+4. [Custom Sort Types](#custom-sort-types)
+5. [Resolver Patterns](#resolver-patterns)
+6. [Best Practices](#best-practices)
+7. [References](#references)
 
 ---
 
-## Cursor Pagination Implementation
+## Implementation Approach
 
-### Research Findings (Task 4.1)
+### Architecture Overview
 
-Hot Chocolate's `[UsePaging]` attribute on `IQueryable<T>` provides **true cursor-based pagination** that complies with the [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm), not offset/limit pagination.
-
-### Key Characteristics
-
-#### True Cursor-Based Pagination
-
-- **Connection Types**: When `[UsePaging]` is applied to an `IQueryable<T>` method, Hot Chocolate automatically generates Connection types with:
-  - `edges` array containing `{ node: T, cursor: string }` objects
-  - `pageInfo` object with `hasNextPage`, `hasPreviousPage`, `startCursor`, `endCursor`
-  - Cursor-based query arguments: `first`, `after`, `last`, `before` (not `skip`/`take` or `offset`/`limit`)
-
-- **GraphQL API Surface**: The GraphQL API is fully cursor-based per the GraphQL Cursor Connections Specification, even if the internal SQL implementation may use `Take`/`Skip` operations for query execution.
-
-#### UsePaging vs UseOffsetPaging
-
-Hot Chocolate provides two pagination approaches:
-
-- **`[UsePaging]`**: Cursor-based pagination (Connection types) - **Recommended for stable, deterministic pagination**
-- **`[UseOffsetPaging]`**: Offset/limit pagination (skip/take parameters) - Useful for simpler scenarios but less stable for changing datasets
-
-**Decision**: Use `[UsePaging]` for all paginated queries to provide true cursor-based pagination.
-
-### Stable Default Ordering Requirement
-
-**Critical Limitation**: Cursor pagination requires stable, deterministic ordering to ensure consistent cursor behavior across pagination requests.
-
-**Implementation Pattern**:
-```csharp
-[UsePaging]
-[UseProjection]
-[UseFiltering]
-[UseSorting]
-public IQueryable<Types.Location> GetLocations(StuffTrackerDbContext context)
-    => context.Locations
-        .OrderBy(l => l.Id) // Stable default ordering for deterministic pagination
-        .Select(l => new Types.Location { /* ... */ });
+```mermaid
+graph LR
+    EFEntity[EF Entity<br/>LocationEntity] -->|maps to| GraphQLType[ObjectType&lt;LocationEntity&gt;<br/>LocationType]
+    GraphQLType -->|exposes| Schema[GraphQL Schema<br/>Location type]
+    Resolver[Query Resolver] -->|returns| IQ[IQueryable&lt;LocationEntity&gt;]
+    IQ -->|UseProjection| Projection[Automatic Projection]
+    Projection -->|generates SQL| DB[(Database)]
+    DB -->|results| DTO[GraphQL Response<br/>Location DTOs]
+    
+    style EFEntity fill:#FF6B6B
+    style GraphQLType fill:#87CEEB
+    style Schema fill:#90EE90
+    style Projection fill:#FFD700
 ```
 
-**Rationale**: 
-- Default ordering by `Id` ensures deterministic cursor positions
-- Client sorting via `[UseSorting]` can override default ordering while maintaining stable pagination
-- Without stable ordering, cursor positions may shift if data changes between requests
+### Key Principles
+
+1. **Clean Separation**: EF entities (`LocationEntity`, `RoomEntity`, `ItemEntity`) never appear in GraphQL schema
+2. **Automatic Projection**: Hot Chocolate's `[UseProjection]` handles Entity → DTO mapping automatically
+3. **Efficient Queries**: Filtering, sorting, and pagination translate directly to optimized SQL
+4. **Type Safety**: Compiler enforces correct relationships between entities and GraphQL types
 
 ### Configuration
 
-No explicit `.AddPaging()` call is required in `Program.cs`. Hot Chocolate automatically enables pagination middleware when `[UsePaging]` attributes are detected on resolver methods.
-
-**Configuration Pattern**:
 ```csharp
+// Program.cs
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
     .AddMutationType<Mutation>()
-    .AddProjections()
-    .AddFiltering()
-    .AddSorting();
-    // Pagination auto-enabled via [UsePaging] attribute
+    .AddType<LocationType>()            // Register ObjectType<LocationEntity>
+    .AddType<RoomType>()                // Register ObjectType<RoomEntity>
+    .AddType<ItemType>()                // Register ObjectType<ItemEntity>
+    .AddProjections()                   // Enable automatic projections
+    .AddFiltering()                     // Enable filtering
+    .AddSorting()                       // Enable sorting
+    .AddType<LocationSortType>()        // Custom sort types for determinism
+    .AddType<ItemSortType>()
+    .AddDbContextCursorPagingProvider() // Enable keyset pagination
+    .ModifyPagingOptions(opt => {
+        opt.DefaultPageSize = 50;
+        opt.MaxPageSize = 1000;
+        opt.IncludeTotalCount = true;
+    });
 ```
-
-### Official Documentation References
-
-- [Hot Chocolate Pagination Documentation](https://chillicream.com/docs/hotchocolate/v13/fetching-data/pagination)
-- [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)
 
 ---
 
-## Projection Caveats
+## ObjectType Pattern
 
-### Manual Projections vs Automatic Projections
+### Defining GraphQL Types
 
-To maintain strict EF/GQL separation, **manual `Select()` projections** are used instead of Hot Chocolate's automatic projection features that work directly with EF entities.
+GraphQL types are defined as `ObjectType<TEntity>` classes that map EF entities to the GraphQL schema:
 
-#### Manual Projection Pattern
-
-**Query Pattern**:
 ```csharp
-[UsePaging]
-[UseProjection]
-[UseFiltering]
-[UseSorting]
-public IQueryable<Types.Location> GetLocations(StuffTrackerDbContext context)
-    => context.Locations
-        .OrderBy(l => l.Id)
-        .Select(l => new Types.Location
-        {
-            Id = l.Id,
-            Name = l.Name,
-            CreatedAt = l.CreatedAt
-        });
-```
-
-**Mutation Pattern**:
-```csharp
-[UseProjection]
-public async Task<Types.Location> AddLocation(string name, StuffTrackerDbContext context, CancellationToken cancellationToken)
+// StuffTracker.Api/GraphQL/Types/LocationType.cs
+public class LocationType : ObjectType<LocationEntity>
 {
-    var location = new LocationEntity { Name = name, CreatedAt = DateTime.UtcNow };
-    context.Locations.Add(location);
-    await context.SaveChangesAsync(cancellationToken);
-    
-    return new Types.Location
+    protected override void Configure(IObjectTypeDescriptor<LocationEntity> descriptor)
     {
-        Id = location.Id,
-        Name = location.Name,
-        CreatedAt = location.CreatedAt
-    };
+        descriptor.Name("Location");  // GraphQL type name
+        
+        // Let Hot Chocolate infer fields from entity properties
+        descriptor.Field(l => l.Id);
+        descriptor.Field(l => l.Name);
+        descriptor.Field(l => l.CreatedAt);
+        
+        // Exclude navigation properties from automatic exposure
+        descriptor.Ignore(l => l.Rooms);
+    }
 }
 ```
 
-### Why Manual Projections?
+### Benefits
 
-1. **Explicit Control**: Ensures only intended DTO properties are exposed
-2. **Type Safety**: Compiler enforces correct property mapping
-3. **Separation of Concerns**: EF entities never appear in GraphQL schema
-4. **No Entity Leakage**: Prevents accidental exposure of entity properties or navigation properties
+| Benefit | Description |
+|---------|-------------|
+| **Separation** | EF entity structure hidden from GraphQL clients |
+| **Automatic Mapping** | Hot Chocolate handles projection without manual `Select()` |
+| **Schema Control** | Explicitly control which fields are exposed |
+| **Performance** | `[UseProjection]` analyzes GraphQL queries to fetch only requested fields |
 
-### Filtering and Sorting Translation
+### Example GraphQL Type Definitions
 
-**Important Finding**: When using manual projections with simple property mappings (matching names between entity and DTO), EF Core can translate filtering and sorting operations on DTO properties back to entity properties.
-
-**Example**:
 ```csharp
-// Client GraphQL query filters on DTO property:
-// items(where: { name: { contains: "drill" } })
+// LocationType.cs
+public class LocationType : ObjectType<LocationEntity>
+{
+    protected override void Configure(IObjectTypeDescriptor<LocationEntity> descriptor)
+    {
+        descriptor.Name("Location");
+        descriptor.Field(l => l.Id);
+        descriptor.Field(l => l.Name);
+        descriptor.Field(l => l.CreatedAt);
+        descriptor.Ignore(l => l.Rooms);  // Don't auto-expose navigation
+    }
+}
 
-// EF Core translates filter to entity property in SQL:
-// WHERE Name LIKE '%drill%'
+// RoomType.cs
+public class RoomType : ObjectType<RoomEntity>
+{
+    protected override void Configure(IObjectTypeDescriptor<RoomEntity> descriptor)
+    {
+        descriptor.Name("Room");
+        descriptor.Field(r => r.Id);
+        descriptor.Field(r => r.Name);
+        descriptor.Field(r => r.LocationId);
+        descriptor.Field(r => r.CreatedAt);
+        descriptor.Ignore(r => r.Location);  // Control nested data exposure
+        descriptor.Ignore(r => r.Items);
+    }
+}
+
+// ItemType.cs
+public class ItemType : ObjectType<ItemEntity>
+{
+    protected override void Configure(IObjectTypeDescriptor<ItemEntity> descriptor)
+    {
+        descriptor.Name("Item");
+        descriptor.Field(i => i.Id);
+        descriptor.Field(i => i.Name);
+        descriptor.Field(i => i.Quantity);
+        descriptor.Field(i => i.RoomId);
+        descriptor.Field(i => i.CreatedAt);
+        descriptor.Ignore(i => i.Room);  // Control nested data exposure
+    }
+}
 ```
-
-**Limitation**: This translation only works when:
-- DTO property names match entity property names exactly
-- Projection uses simple direct mapping (not computed properties or complex expressions)
-- Filtering/sorting attributes are applied to the `IQueryable<DTO>` after the projection
-
-### Attribute Combinations
-
-#### Supported Combinations
-
-The following attribute combinations work correctly:
-
-- `[UsePaging]` + `[UseProjection]` + `[UseFiltering]` + `[UseSorting]` on `IQueryable<DTO>`
-- `[UseProjection]` on single-item queries/mutations returning `DTO` or `Task<DTO>`
-
-#### Considerations
-
-- **`[UseProjection]` on Manual Projections**: The `[UseProjection]` attribute is still required even with manual `Select()` projections. It enables Hot Chocolate's projection optimization middleware, which analyzes GraphQL query selection sets to optimize database queries.
-
-- **Projection Optimization**: Hot Chocolate's projection middleware can optimize queries by analyzing which fields are requested in the GraphQL query, even when using manual projections. However, the effectiveness depends on the complexity of the projection expression.
-
-### Trade-offs
-
-**Benefits**:
-- Complete control over exposed data
-- Compiler-enforced type safety
-- No risk of entity leakage
-- Clear separation between database schema and API contract
-
-**Costs**:
-- More verbose code (manual mapping required)
-- Maintenance overhead when entity/DTO properties change
-- Potential for mapping errors if properties are added but not mapped
 
 ---
 
-## EF/GQL Separation Constraints
+## Keyset Pagination
 
-### Strict Separation Enforcement
+### What is Keyset Pagination?
 
-The StuffTracker application enforces strict separation between EF entities and GraphQL DTOs through multiple mechanisms:
+Keyset pagination uses composite `WHERE` clauses based on field values instead of `OFFSET` for better performance:
 
-#### 1. Separate Type Definitions
+```sql
+-- Traditional Offset Pagination (SLOW for large offsets)
+SELECT * FROM Locations ORDER BY Name, Id LIMIT 10 OFFSET 1000;  -- Scans 1000 rows
 
-- **EF Entities**: Defined in `StuffTracker.Domain/Entities/` (e.g., `LocationEntity`, `RoomEntity`, `ItemEntity`)
-- **GraphQL DTOs**: Defined in `StuffTracker.Api/GraphQL/Types/` (e.g., `Location`, `Room`, `Item`)
-
-#### 2. Manual Projections
-
-All queries and mutations use explicit manual projections:
-- **Queries**: `Select()` expressions mapping entities to DTOs
-- **Mutations**: Manual DTO construction from entities after persistence
-
-#### 3. Schema Registration
-
-Only DTO types are registered in the GraphQL schema:
-```csharp
-.AddType<StuffTracker.Api.GraphQL.Types.LocationType>()
-.AddType<StuffTracker.Api.GraphQL.Types.RoomType>()
-.AddType<StuffTracker.Api.GraphQL.Types.ItemType>()
+-- Keyset Pagination (FAST, consistent performance)
+SELECT * FROM Locations 
+WHERE (Name, Id) > ('Home', 2)  -- Cursor values from previous page
+ORDER BY Name, Id 
+LIMIT 10;  -- Uses index to seek directly
 ```
 
-No EF entity types are registered, preventing accidental exposure.
+### Configuration
 
-#### 4. Return Type Enforcement
+Enable keyset pagination globally:
 
-All resolver methods enforce DTO-only returns:
-- **Query resolvers**: Return `IQueryable<DTO>` or `Connection<DTO>` (never `IQueryable<Entity>`)
-- **Mutation resolvers**: Return `Task<DTO>` (never `Task<Entity>`)
-
-### Limitations and Constraints
-
-#### 1. Manual Mapping Maintenance
-
-**Constraint**: When EF entity properties change, corresponding DTO mappings must be manually updated.
-
-**Impact**: Risk of missing property updates if mapping code is not updated alongside entity changes.
-
-**Mitigation**: Compiler warnings/errors help catch missing properties, but requires discipline to update all mappings.
-
-#### 2. Nested Relationship Projection Complexity
-
-**Constraint**: Projecting nested relationships (e.g., `Item.Room.Location`) requires careful manual projection or separate resolvers.
-
-**Current Approach**: DTOs include optional navigation properties (`Item.Room`, `Room.Location`) that can be resolved separately, but projections in queries do not automatically include nested data.
-
-**Example**:
 ```csharp
-// DTO definition includes optional navigation:
-public class Item
-{
-    public int Id { get; set; }
-    // ... other properties
-    public Room? Room { get; set; } // Optional nested DTO
+builder.Services
+    .AddGraphQLServer()
+    .AddDbContextCursorPagingProvider()  // ← Enables keyset pagination
+    .ModifyPagingOptions(opt => {
+        opt.DefaultPageSize = 50;
+        opt.MaxPageSize = 1000;
+        opt.IncludeTotalCount = true;
+        opt.RequirePagingBoundaries = false;
+    });
+```
+
+### Required Database Indexes
+
+Composite indexes are critical for efficient keyset queries:
+
+```sql
+-- Location indexes for (Name, Id) and (CreatedAt, Id) sorts
+CREATE INDEX IX_Locations_Name_Id ON Locations (Name, Id);
+CREATE INDEX IX_Locations_CreatedAt_Id ON Locations (CreatedAt, Id);
+
+-- Item indexes for common sort patterns
+CREATE INDEX IX_Items_Name_Id ON Items (Name, Id);
+CREATE INDEX IX_Items_Quantity_Id ON Items (Quantity, Id);
+CREATE INDEX IX_Items_CreatedAt_Id ON Items (Quantity, Id);
+```
+
+### Performance Comparison
+
+| Aspect | Offset Pagination | Keyset Pagination |
+|--------|------------------|-------------------|
+| **Performance** | O(n) - degrades with page number | O(log n) - consistent |
+| **Page 1** | Fast | Fast |
+| **Page 100** | Slow (scans 1000 rows) | Fast (index seek) |
+| **Page 1000** | Very slow (scans 10000 rows) | Fast (index seek) |
+| **Cursor Stability** | Invalid if data changes | Remains valid |
+| **SQL Pattern** | `LIMIT 10 OFFSET 1000` | `WHERE (field, id) > (val1, val2)` |
+
+### GraphQL Query Example
+
+```graphql
+# First page
+query {
+  locations(first: 5, order: { name: ASC }) {
+    nodes { id name }
+    pageInfo {
+      hasNextPage
+      endCursor  # Use this for next page
+    }
+  }
 }
 
-// Query projection does not include nested data:
-.Select(i => new Types.Item
-{
-    Id = i.Id,
-    // ... direct properties only
-    // Room not projected here - requires separate resolver or explicit Include()
-})
+# Next page using cursor
+query {
+  locations(first: 5, after: "cursor_value", order: { name: ASC }) {
+    nodes { id name }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
 ```
 
-#### 3. Filtering/Sorting on Nested Properties
+---
 
-**Constraint**: Filtering and sorting on nested DTO properties (e.g., `items { room { location { name } } }`) requires special handling.
+## Custom Sort Types
 
-**Current Limitation**: Hot Chocolate's filtering/sorting middleware works best with direct properties. Complex nested filtering may require custom resolvers or explicit query construction.
+### Purpose
 
-#### 4. Projection Performance
+Custom sort types ensure deterministic pagination by explicitly exposing `Id` as a sortable field, allowing it to be used as a tiebreaker.
 
-**Trade-off**: Manual projections provide explicit control but may prevent some Hot Chocolate projection optimizations that work with automatic entity projections.
-
-**Impact**: May result in slightly less efficient queries compared to automatic projections, but still benefits from EF Core query translation and Hot Chocolate's projection analysis.
-
-### Patterns and Best Practices
-
-#### Query Resolver Pattern
+### Implementation
 
 ```csharp
-[UsePaging]           // Cursor-based pagination
-[UseProjection]       // Enable projection optimization
-[UseFiltering]        // Enable filtering
-[UseSorting]          // Enable sorting
-public IQueryable<Types.Location> GetLocations(StuffTrackerDbContext context)
-    => context.Locations
-        .OrderBy(l => l.Id) // Stable default ordering
-        .Select(l => new Types.Location
-        {
-            Id = l.Id,
-            Name = l.Name,
-            CreatedAt = l.CreatedAt
-        });
+// StuffTracker.Api/GraphQL/Sorting/LocationSortType.cs
+public class LocationSortType : SortInputType<LocationEntity>
+{
+    protected override void Configure(ISortInputTypeDescriptor<LocationEntity> descriptor)
+    {
+        descriptor.Name("LocationSortInput");
+        descriptor.BindFieldsImplicitly();  // Bind Name, CreatedAt, etc.
+        descriptor.Field(l => l.Id).Name("id");  // Explicitly expose Id for tiebreaking
+    }
+}
+
+// StuffTracker.Api/GraphQL/Sorting/ItemSortType.cs
+public class ItemSortType : SortInputType<ItemEntity>
+{
+    protected override void Configure(ISortInputTypeDescriptor<ItemEntity> descriptor)
+    {
+        descriptor.Name("ItemSortInput");
+        descriptor.BindFieldsImplicitly();  // Bind Name, Quantity, etc.
+        descriptor.Field(i => i.Id).Name("id");  // Explicitly expose Id for tiebreaking
+    }
+}
 ```
 
-#### Mutation Resolver Pattern
+### Why Custom Sort Types?
+
+**Problem**: Without `Id` as a sort field, queries sorting by non-unique fields (like `name`) can produce non-deterministic results, breaking cursor pagination.
+
+**Solution**: Custom sort types explicitly expose `Id`, allowing clients to specify stable sort orders:
+
+```graphql
+# Without Id tiebreaker (non-deterministic if names duplicate)
+query { locations(first: 10, order: { name: ASC }) { ... } }
+
+# With Id tiebreaker (deterministic)
+query { locations(first: 10, order: { name: ASC, id: ASC }) { ... } }
+```
+
+### SQL Generated
+
+```sql
+-- Without Id: non-deterministic
+ORDER BY Name
+
+-- With Id: deterministic
+ORDER BY Name, Id
+```
+
+---
+
+## Resolver Patterns
+
+### Query Resolver Pattern
+
+Queries return `IQueryable<Entity>` and rely on middleware for filtering, sorting, and pagination:
+
+```csharp
+[UsePaging]                               // Enables cursor pagination
+[UseProjection]                           // Enables automatic Entity → DTO projection
+[UseFiltering]                            // Enables client-side filtering
+[UseSorting(typeof(LocationSortType))]    // Enables sorting with custom sort type
+public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
+    => context.Locations;  // Return IQueryable - let middleware handle the rest
+```
+
+**Middleware Order**: `UsePaging` → `UseProjection` → `UseFiltering` → `UseSorting`
+
+### Single Item Query Pattern
 
 ```csharp
 [UseProjection]
-public async Task<Types.Location> AddLocation(
+public LocationEntity? GetLocation(int id, StuffTrackerDbContext context)
+    => context.Locations.FirstOrDefault(l => l.Id == id);
+```
+
+### Mutation Resolver Pattern
+
+Mutations return entities directly, and `[UseProjection]` handles DTO mapping:
+
+```csharp
+[UseProjection]
+public async Task<LocationEntity> AddLocation(
     string name,
     StuffTrackerDbContext context,
     CancellationToken cancellationToken)
 {
-    // Create and persist entity
-    var location = new LocationEntity { Name = name, CreatedAt = DateTime.UtcNow };
+    var location = new LocationEntity 
+    { 
+        Name = name, 
+        CreatedAt = DateTime.UtcNow 
+    };
+    
     context.Locations.Add(location);
     await context.SaveChangesAsync(cancellationToken);
     
-    // Return DTO (never return entity)
-    return new Types.Location
-    {
-        Id = location.Id,
-        Name = location.Name,
-        CreatedAt = location.CreatedAt
-    };
+    return location;  // Hot Chocolate projects to Location DTO automatically
 }
 ```
 
-#### Connection Type Handling
+### Delete Mutation Pattern
 
-Connection types (from `[UsePaging]`) automatically wrap DTOs:
-- `IQueryable<Types.Location>` → `LocationConnection` Generator automatically creates Connection type
-- Connection structure: `{ edges: [{ node: Location, cursor: string }], pageInfo: {...} }`
-- No manual Connection type definition required
+```csharp
+public async Task<bool> DeleteItem(
+    int itemId,
+    StuffTrackerDbContext context,
+    CancellationToken cancellationToken)
+{
+    var item = await context.Items.FindAsync(itemId);
+    if (item == null)
+        throw new GraphQLException("Item not found.");
+    
+    context.Items.Remove(item);
+    await context.SaveChangesAsync(cancellationToken);
+    
+    return true;
+}
+```
 
 ---
 
-## Best Practices and Patterns
+## Best Practices
 
-### 1. Always Use Stable Default Ordering
+### 1. Always Return Entities from Resolvers
 
-**Practice**: Apply `.OrderBy(x => x.Id)` as default ordering before projection to ensure deterministic cursor pagination.
+✅ **DO**: Return `IQueryable<Entity>` or `Entity` directly
 
-**Rationale**: Cursor positions depend on stable ordering. Without it, pagination results may be inconsistent.
+```csharp
+public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
+    => context.Locations;
+```
 
-### 2. Always Project Entities to DTOs
+❌ **DON'T**: Manually project to DTOs
 
-**Practice**: Never return EF entities directly from resolvers. Always use explicit `Select()` projections or manual DTO construction.
+```csharp
+// Not needed - Hot Chocolate handles this
+public IQueryable<Location> GetLocations(StuffTrackerDbContext context)
+    => context.Locations.Select(l => new Location { ... });
+```
 
-**Rationale**: Maintains strict separation and prevents entity leakage.
+### 2. Use Custom Sort Types for Paginated Queries
 
-### 3. Register Only DTO Types
+✅ **DO**: Define custom sort types with explicit `Id` field
 
-**Practice**: Only register GraphQL DTO types in schema configuration, never EF entity types.
+```csharp
+[UsePaging]
+[UseSorting(typeof(LocationSortType))]
+public IQueryable<LocationEntity> GetLocations(...)
+```
 
-**Rationale**: Prevents accidental entity exposure in GraphQL schema.
+❌ **DON'T**: Rely on default sorting without `Id` tiebreaker
 
-### 4. Use [UseProjection] Even with Manual Projections
+```csharp
+[UsePaging]
+[UseSorting]  // Missing custom sort type
+public IQueryable<LocationEntity> GetLocations(...)
+```
 
-**Practice**: Always include `[UseProjection]` attribute even when using manual `Select()` projections.
+### 3. Register ObjectType Classes, Not Entities
 
-**Rationale**: Enables Hot Chocolate's projection optimization middleware, which analyzes GraphQL query selection sets to optimize queries.
+✅ **DO**: Register `ObjectType<Entity>` classes
 
-### 5. Keep DTO Properties Simple
+```csharp
+.AddType<LocationType>()  // LocationType : ObjectType<LocationEntity>
+```
 
-**Practice**: Keep DTO properties as simple mappings from entity properties when possible. Complex computed properties may prevent filtering/sorting translation.
+❌ **DON'T**: Register entities directly
 
-**Rationale**: EF Core can translate filters/sorts on simple DTO properties back to entity properties, but complex expressions may not translate.
+```csharp
+.AddType<LocationEntity>()  // Exposes EF entity to GraphQL
+```
 
-### 6. Validate Return Types at Build Time
+### 4. Let Middleware Handle Ordering
 
-**Practice**: Rely on compiler type checking to enforce DTO-only returns.
+✅ **DO**: Let `[UseSorting]` handle ordering
 
-**Rationale**: Catches violations at compile time, preventing runtime entity leakage.
+```csharp
+public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
+    => context.Locations;  // No OrderBy() needed
+```
+
+❌ **DON'T**: Hardcode `OrderBy()` in resolvers
+
+```csharp
+public IQueryable<LocationEntity> GetLocations(StuffTrackerDbContext context)
+    => context.Locations.OrderBy(l => l.Id);  // Conflicts with client sorting
+```
+
+### 5. Create Composite Indexes for Sort Fields
+
+✅ **DO**: Create indexes for common sort patterns
+
+```sql
+CREATE INDEX IX_Locations_Name_Id ON Locations (Name, Id);
+```
+
+❌ **DON'T**: Rely on single-column indexes
+
+```sql
+CREATE INDEX IX_Locations_Name ON Locations (Name);  -- Insufficient for keyset
+```
 
 ---
 
 ## References
 
-### Hot Chocolate Official Documentation
-
-- [Projections](https://chillicream.com/docs/hotchocolate/v13/data-fetching/projections)
-- [Pagination](https://chillicream.com/docs/hotchocolate/v13/fetching-data/pagination)
-- [Filtering](https://chillicream.com/docs/hotchocolate/v13/data-fetching/filtering)
-- [Sorting](https://chillicream.com/docs/hotchocolate/v13/data-fetching/sorting)
+### Hot Chocolate Documentation
+- [ObjectType Documentation](https://chillicream.com/docs/hotchocolate/v15/defining-a-schema/object-types)
+- [Projections](https://chillicream.com/docs/hotchocolate/v15/fetching-data/projections)
+- [Pagination](https://chillicream.com/docs/hotchocolate/v15/fetching-data/pagination)
+- [Filtering](https://chillicream.com/docs/hotchocolate/v15/fetching-data/filtering)
+- [Sorting](https://chillicream.com/docs/hotchocolate/v15/fetching-data/sorting)
 
 ### GraphQL Specifications
+- [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm)
 
-- [GraphQL Cursor Connections Specification](https://relay.dev/graphql/connections.htm) (Relay)
+### Related Documentation
+- [Custom Sort Types](Custom-Sort-Types.md) - Detailed guide to custom sort type implementation
+- [../KEYSET_PAGINATION_IMPLEMENTATION.md](../KEYSET_PAGINATION_IMPLEMENTATION.md) - Keyset pagination setup and testing
+- [../README_Nitro.md](../README_Nitro.md) - GraphQL IDE usage guide with query examples
 
-### Implementation Task References
-
-- **Task 4.1**: Research findings on cursor pagination approach - `.apm/Memory/Phase_04_filtering-sorting-pagination-integration/Task_4_1_Research_Cursor_Pagination_Approach_and_Apply_Filtering_Sorting_Pagination.md`
-- **Task 4.2**: DTO-only return path verification - `.apm/Memory/Phase_04_filtering-sorting-pagination-integration/Task_4_2_Verify_DTO_only_Return_Paths.md`
-
-### Related Files
-
+### Implementation Files
 - Query Resolvers: `StuffTracker.Api/GraphQL/Query.cs`
 - Mutation Resolvers: `StuffTracker.Api/GraphQL/Mutation.cs`
 - GraphQL Configuration: `StuffTracker.Api/Program.cs`
-- DTO Types: `StuffTracker.Api/GraphQL/Types/*.cs`
+- GraphQL Types: `StuffTracker.Api/GraphQL/Types/*.cs`
+- Sort Types: `StuffTracker.Api/GraphQL/Sorting/*.cs`
 
 ---
 
-## Document History
-
-- **Created**: Task 6.1 - Document EF/GQL separation limitations
-- **Last Updated**: 2025-01-XX
-- **Author**: Agent_Docs
-
+**Last Updated**: November 3, 2025  
+**Hot Chocolate Version**: 15.1.11  
+**.NET Version**: 9.0
