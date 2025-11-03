@@ -6,7 +6,7 @@ Here’s a proposal that’s realistic, fun, and cleanly maps to GraphQL concept
 
 ## 🧩 Project Name: **StuffTracker**
 
-A simple **inventory management app** to track your possessions across different **locations** (e.g., *Home in Cary* and *Lake House*).
+A simple **inventory management app** to track your possessions across different **locations** (e.g., *Home*, *Rental properties*, and *Flip houses*).
 
 It’s small enough to build quickly but rich enough to showcase **GraphQL best practices**.
 
@@ -16,9 +16,9 @@ It’s small enough to build quickly but rich enough to showcase **GraphQL best 
 
 You want to keep track of:
 
-* **Locations** (e.g., *Cary*, *Lake House*)
-* **Rooms** within those locations (e.g., *Garage*, *Living Room*, *Boat Shed*)
-* **Items** within rooms (e.g., *Drill*, *TV*, *Kayak Paddle*)
+* **Locations** (e.g., *Home*, *Rental 101 Howards Ave*, *Flip 3231 Gooseneck Rd*)
+* **Rooms** within those locations (e.g., *Garage*, *Basement*, *Living Room*, *Kitchen*)
+* **Items** within rooms (e.g., *Electronics-TV*, *Furniture-chair*, *Tools-hammer*)
 
 You can query:
 

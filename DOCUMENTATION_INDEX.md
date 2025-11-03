@@ -44,9 +44,20 @@ graph TB
 
 ### Data Model
 
-- **Locations** (e.g., Home, Rental properties)
-  - **Rooms** (e.g., Garage, Basement)
-    - **Items** (e.g., Tools, Electronics)
+- **Locations** (3 seeded):
+  - Home
+  - Rental 101 Howards Ave
+  - Flip 3231 Gooseneck Rd
+- **Rooms** (12 seeded, 4 per location):
+  - Home: Garage, Basement, Attic, Office
+  - Rental: Living Room, Kitchen, Bedroom, Bathroom
+  - Flip: Workshop, Storage, Main Floor, Garage
+- **Items** (~200 seeded with diverse patterns):
+  - Electronics (TV, Radio, Speaker, lamp, etc.)
+  - Furniture (chair, table, desk, etc.)
+  - Kitchen items (Microwave, Oven, etc.)
+  - Tools (Hammer, Screwdriver, wrench, etc.)
+  - Office Supplies (Pen, Notebook, Stapler, etc.)
 
 ### Technology Stack
 
@@ -69,7 +80,7 @@ graph TB
 
 - **Operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `contains`, `startsWith`, `endsWith`
 - **Translation:** Client filters → SQL WHERE clauses
-- **Example:** `where: { name: { contains: "drill" } }` → `WHERE Name LIKE '%drill%'`
+- **Example:** `where: { name: { contains: "lamp" } }` → `WHERE Name LIKE '%lamp%'`
 
 ### Sorting
 
@@ -112,7 +123,7 @@ query {
 
 ```graphql
 mutation {
-  addLocation(name: "Storage Unit") {
+  addLocation(name: "Storage Unit 5B") {
     id
     name
     createdAt

@@ -128,7 +128,7 @@ query {
 
 ```graphql
 query {
-  items(search: "laptop", first: 10) {
+  items(search: "lamp", first: 10) {
     nodes {
       id
       name

@@ -6,9 +6,9 @@ A simple inventory management application built with .NET 9 and Hot Chocolate Gr
 
 StuffTracker is a GraphQL-based inventory management system that allows you to:
 
-- Track **Locations** (e.g., *Home in Cary*, *Lake House*)
-- Track **Rooms** within those locations (e.g., *Garage*, *Living Room*, *Boat Shed*)
-- Track **Items** within rooms (e.g., *Drill*, *TV*, *Kayak Paddle*)
+- Track **Locations** (e.g., *Home*, *Rental 101 Howards Ave*, *Flip 3231 Gooseneck Rd*)
+- Track **Rooms** within those locations (e.g., *Garage*, *Basement*, *Living Room*, *Kitchen*)
+- Track **Items** within rooms (e.g., *Electronics-lamp*, *Furniture-chair*, *Tools-hammer*)
 
 The application demonstrates GraphQL best practices including:
 - Cursor-based pagination
@@ -372,7 +372,7 @@ query {
 **Add a new location:**
 ```graphql
 mutation {
-  addLocation(name: "Lake House") {
+  addLocation(name: "Storage Unit 5B") {
     id
     name
     createdAt
